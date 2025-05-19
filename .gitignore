@@ -1,0 +1,31 @@
+/vendor/
+
+# Ignore environment variables
+.env
+
+credentials.json
+
+# Ignore Composer dependencies (optional if you're using GitHub & composer install later)
+vendor/
+
+# Ignore token cache file
+token.json
+
+# Ignore temporary Excel files or auto-saves
+*.tmp
+*.bak
+*.xlsx~
+~$*.xlsx
+
+# Ignore OS junk
+.DS_Store
+Thumbs.db
+
+# Ignore logs
+*.log
+
+# Ignore IDE/editor settings
+.vscode/
+.idea/
+*.sublime-workspace
+*.sublime-project

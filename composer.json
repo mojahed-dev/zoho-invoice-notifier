@@ -1,0 +1,18 @@
+{
+    "name": "sales/zoho-notifier",
+    "autoload": {
+        "psr-4": {
+            "Auth\\": "src/auth/",
+            "Api\\": "src/api/"
+        }
+    },
+    "authors": [
+        {
+            "name": "mojahed-dev",
+            "email": "mojahed.alo.habib@gmail.com"
+        }
+    ],
+    "require": {
+        "vlucas/phpdotenv": "^5.6"
+    }
+}
