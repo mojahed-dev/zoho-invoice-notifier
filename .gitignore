@@ -29,3 +29,4 @@ Thumbs.db
 .idea/
 *.sublime-workspace
 *.sublime-project
+access_token.json
