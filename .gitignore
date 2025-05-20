@@ -2,6 +2,8 @@
 
 # Ignore environment variables
 .env
+log.txt
+log/
 
 credentials.json
 
