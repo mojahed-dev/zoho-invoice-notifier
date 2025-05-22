@@ -6,6 +6,8 @@ use Dotenv\Dotenv;
 use Auth\TokenManager;
 use Api\ZohoInvoice;
 use Services\TwilioSender;
+use PHPMailer\PHPMailer\PHPMailer;
+use PHPMailer\PHPMailer\Exception;
 
 // === Load environment variables and set timezone ===
 $dotenv = Dotenv::createImmutable(__DIR__ . '/../../');
@@ -15,12 +17,16 @@ date_default_timezone_set('Asia/Riyadh');
 // === Prepare logging directory and file ===
 $logDir = __DIR__ . '/../../log';
 $logFile = $logDir . '/sent_log.txt';
+$csvFile = $logDir . '/sent_log.csv';
 
 if (!is_dir($logDir)) {
-    mkdir($logDir, 0755, true); // Create log/ folder if it doesn't exist
+    mkdir($logDir, 0755, true);
 }
 if (!file_exists($logFile)) {
-    file_put_contents($logFile, ''); // Create empty sent_log.txt if missing
+    file_put_contents($logFile, '');
+}
+if (!file_exists($csvFile)) {
+    file_put_contents($csvFile, "InvoiceID,Interval,Phone,Status,Date\n");
 }
 
 // === Initialize Zoho and Twilio clients ===
@@ -38,33 +44,27 @@ $reminderDays = [15, 13, 11, 9, 7, 5, 3, 1, 2, 0];
 $todayMidnight = (new DateTime())->setTime(0, 0);
 
 // === Step 1: Clean sent_log.txt by removing paid invoice reminders ===
-$logEntries = file($logFile, FILE_IGNORE_NEW_LINES); // Load sent logs
+$logEntries = file($logFile, FILE_IGNORE_NEW_LINES);
 $allInvoices = $zohoInvoice->getInvoices();
-
-// Filter and collect all paid invoice IDs
 $paidIds = array_column(array_filter($allInvoices, fn($inv) => strtolower($inv['status']) === 'paid'), 'invoice_id');
-
-// Remove log entries related to paid invoices
 $filteredLog = array_filter($logEntries, fn($entry) => !in_array(explode('_', $entry)[0], $paidIds));
-file_put_contents($logFile, implode(PHP_EOL, $filteredLog) . PHP_EOL); // Overwrite cleaned log
+file_put_contents($logFile, implode(PHP_EOL, $filteredLog) . PHP_EOL);
 
 // === Step 2: Loop through all invoices and send reminders ===
 foreach ($allInvoices as $invoice) {
-    // Skip if invoice has no due date or already paid
     if (empty($invoice['due_date']) || strtolower($invoice['status']) === 'paid') continue;
 
     $dueDate = (new DateTime($invoice['due_date']))->setTime(0, 0);
-    $interval = (int) $todayMidnight->diff($dueDate)->format('%r%a') + 1; // Calculate days until due
+    $interval = (int) $todayMidnight->diff($dueDate)->format('%r%a') + 1;
 
-    if (!in_array($interval, $reminderDays)) continue; // Skip if not in reminder schedule
+    if (!in_array($interval, $reminderDays)) continue;
 
     $logKey = "{$invoice['invoice_id']}_{$interval}";
     if (in_array($logKey, $filteredLog)) {
         echo "⚠️ Already reminded: $logKey\n";
-        continue; // Skip if already sent
+        continue;
     }
 
-    // Try to fetch the customer phone number
     $rawPhone = $invoice['phone'] ?? $invoice['billing_address']['phone'] ?? $invoice['shipping_address']['phone'] ?? null;
     $customerPhone = $rawPhone ? 'whatsapp:' . $rawPhone : null;
     if (!$customerPhone) {
@@ -72,19 +72,59 @@ foreach ($allInvoices as $invoice) {
         continue;
     }
 
-    // Build WhatsApp message
     $message = "*Invoice Reminder*\n" .
                "Invoice No: *{$invoice['number']}*\n" .
                "Amount Due: *{$invoice['total']}*\n" .
                "Due Date: *{$invoice['due_date']}*\n\n" .
                "Please settle on or before the due date. Thank you!";
 
-    // Attempt to send the message
-    try {
-        $sid = $twilio->sendWhatsAppText($customerPhone, $twilioFrom, $message);
-        echo "✅ Sent to $customerPhone (SID: $sid)\n";
-        file_put_contents($logFile, $logKey . PHP_EOL, FILE_APPEND); // Log sent reminder
-    } catch (Exception $e) {
-        echo "❌ Failed to send to $customerPhone: " . $e->getMessage() . "\n";
-    }
+    $status = 'SENT';
+
+    // ⚠️ Email fallback is disabled until SMTP credentials are provided.
+    // try {
+    //     $sid = $twilio->sendWhatsAppText($customerPhone, $twilioFrom, $message);
+    //     echo "✅ Sent to $customerPhone (SID: $sid)\n";
+    // } catch (Exception $e) {
+        // echo "❌ WhatsApp failed for {$invoice['invoice_id']}. Trying email...\n";
+
+        // $email = $invoice['customer_email'] ?? null;
+        // if ($email) {
+        //     try {
+        //         $mail = new PHPMailer(true);
+        //         $mail->isSMTP();
+        //         $mail->Host = $_ENV['SMTP_HOST'];
+        //         $mail->SMTPAuth = true;
+        //         $mail->Username = $_ENV['SMTP_USER'];
+        //         $mail->Password = $_ENV['SMTP_PASS'];
+        //         $mail->SMTPSecure = 'tls';
+        //         $mail->Port = 587;
+
+        //         $mail->setFrom($_ENV['SMTP_FROM'], 'Billing Team');
+        //         $mail->addAddress($email);
+        //         $mail->Subject = "Invoice Reminder - {$invoice['number']}";
+        //         $mail->Body = strip_tags($message);
+
+        //         $mail->send();
+        //         echo "✅ Email sent to $email\n";
+        //         $status = 'EMAIL';
+        //     } catch (Exception $ex) {
+        //         echo "❌ Email failed for $email: " . $mail->ErrorInfo . "\n";
+        //         $status = 'FAILED';
+        //     }
+        // } else {
+        //     echo "❌ No email available for invoice {$invoice['invoice_id']}\n";
+        //     $status = 'FAILED';
+        // }
+    
+
+    // Log result in both text and CSV
+    file_put_contents($logFile, $logKey . PHP_EOL, FILE_APPEND);
+    $logRow = [
+        $invoice['invoice_id'],
+        $interval,
+        $customerPhone ?? 'none',
+        $status,
+        date('Y-m-d H:i:s')
+    ];
+    file_put_contents($csvFile, implode(',', $logRow) . "\n", FILE_APPEND);
 }
