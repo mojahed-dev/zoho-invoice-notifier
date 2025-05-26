@@ -23,7 +23,7 @@ if (!is_dir($pdfDir)) mkdir($pdfDir, 0755, true);
 $logFile = "$logDir/sent_log.txt";
 $csvFile = "$logDir/sent_log.csv";
 if (!file_exists($logFile)) file_put_contents($logFile, '');
-if (!file_exists($csvFile)) file_put_contents($csvFile, "InvoiceID,Interval,Phone,Status,Date\n");
+if (!file_exists($csvFile)) file_put_contents($csvFile, "InvoiceID,InvoiceNumber,Interval,Phone,Status,Date\n");
 
 // === Initialize services ===
 $tokenManager = new TokenManager(
@@ -37,7 +37,7 @@ $twilio = new TwilioSender($_ENV['TWILIO_SID'], $_ENV['TWILIO_TOKEN']);
 $notifier = new NotificationService($twilio, $tokenManager);
 $logger = new LoggerService($logFile, $csvFile);
 
-$reminderDays = [15, 13, 11, 9, 7, 5, 3, 1, 2, 0];
+$reminderDays = [66, 45, 40, 39, 35, 19, 15, 13, 12, 11, 10, 9, 7, 5, 3, 4, 1, 2, 0];
 $todayMidnight = (new DateTime())->setTime(0, 0);
 
 // === Fetch invoices and clean logs ===

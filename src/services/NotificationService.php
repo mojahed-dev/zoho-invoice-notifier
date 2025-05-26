@@ -6,15 +6,17 @@ use PHPMailer\PHPMailer\PHPMailer;
 use PHPMailer\PHPMailer\Exception;
 use Services\TwilioSender;
 use Auth\TokenManager;
+use Services\OracleUploader;
 
 /**
  * NotificationService handles sending reminders via WhatsApp or email.
- * It downloads invoice PDFs, constructs messages, and manages fallback logic.
+ * It downloads invoice PDFs, uploads to Oracle, and manages fallback logic.
  */
 class NotificationService
 {
     private TwilioSender $twilio;
     private TokenManager $tokenManager;
+    private OracleUploader $oracleUploader;
 
     /**
      * NotificationService constructor.
@@ -26,6 +28,7 @@ class NotificationService
     {
         $this->twilio = $twilio;
         $this->tokenManager = $tokenManager;
+        $this->oracleUploader = new OracleUploader();
     }
 
     /**
@@ -45,9 +48,16 @@ class NotificationService
             return 'FAILED';
         }
 
-        $pdfPath = "$pdfDir/invoice_{$invoice['invoice_id']}.pdf";
-        $pdfUrl = $this->downloadInvoicePdf($invoice['invoice_id'], $pdfPath);
+        $fileName = "invoice_{$invoice['invoice_id']}.pdf";
+        $pdfPath = "$pdfDir/$fileName";
 
+        // Step 1: Download the invoice PDF
+        $this->downloadInvoicePdf($invoice['invoice_id'], $pdfPath);
+
+        // Step 2: Upload the PDF to Oracle and get a public or PAR link
+        $pdfUrl = $this->oracleUploader->upload($pdfPath, $fileName);
+
+        // Step 3: Compose the WhatsApp message
         $message = "*Invoice Reminder*\n" .
                    "Invoice No: *{$invoice['number']}*\n" .
                    "Amount Due: *{$invoice['total']}*\n" .
@@ -58,9 +68,6 @@ class NotificationService
         try {
             $sid = $this->twilio->sendWhatsAppText($customerPhone, $_ENV['TWILIO_FROM'], $message);
             echo "✅ Sent to $customerPhone (SID: $sid)\n";
-            echo "Invoice No: *{$invoice['number']}*\n";
-            echo "Amount Due: *{$invoice['total']}*\n" ;
-            echo  "Due Date: *{$invoice['due_date']}*\n\n";
             return 'SENT';
         } catch (\Exception $e) {
             echo "❌ WhatsApp failed for {$invoice['invoice_id']}. Trying email...\n";
@@ -73,9 +80,8 @@ class NotificationService
      *
      * @param string $invoiceId The Zoho invoice ID.
      * @param string $pdfPath   File path to save the downloaded PDF.
-     * @return string            Public URL of the PDF (currently a placeholder).
      */
-    private function downloadInvoicePdf(string $invoiceId, string $pdfPath): string
+    private function downloadInvoicePdf(string $invoiceId, string $pdfPath): void
     {
         try {
             $accessToken = $this->tokenManager->getAccessToken();
@@ -93,10 +99,8 @@ class NotificationService
             curl_close($ch);
 
             file_put_contents($pdfPath, $pdfContent);
-            return "https://your-oracle-bucket-url/invoices/invoice_{$invoiceId}.pdf"; // placeholder
         } catch (\Exception $e) {
             echo "❌ Failed to download PDF for invoice $invoiceId\n";
-            return '';
         }
     }
 
@@ -109,6 +113,7 @@ class NotificationService
      */
     private function sendEmailFallback(array $invoice, string $message): string
     {
-        // Uncomment and implement this method when SMTP credentials are available
+        // Email fallback logic can be implemented here
+        return 'FAILED';
     }
 }
