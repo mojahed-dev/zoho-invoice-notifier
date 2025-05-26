@@ -18,7 +18,7 @@ class ZohoInvoice
     public function getInvoices()
     {
         $accessToken = $this->tokenManager->getAccessToken();
-        $url = 'https://www.zohoapis.com/billing/v1/invoices';
+        $url = 'https://www.zohoapis.sa/billing/v1/invoices';
 
 
         $ch = curl_init($url);

@@ -14,20 +14,11 @@ class TokenManager
 
     public function __construct()
     {
-        // $this->clientId = getenv('ZOHO_CLIENT_ID');
-        // $this->clientSecret = getenv('ZOHO_CLIENT_SECRET');
-        // $this->refreshToken = getenv('ZOHO_REFRESH_TOKEN');
-        // $this->baseUrl = getenv('ZOHO_BASE_URL');
-
         $this->clientId = $_ENV['ZOHO_CLIENT_ID'] ?? null;
         $this->clientSecret = $_ENV['ZOHO_CLIENT_SECRET'] ?? null;
         $this->refreshToken = $_ENV['ZOHO_REFRESH_TOKEN'] ?? null;
         $this->baseUrl = $_ENV['ZOHO_AUTH_URL'] ?? null;
-
-        // var_dump($this->baseUrl = 'https://www.zohoapis.com');
-
-
-
+        
         $this->loadToken();
     }
 

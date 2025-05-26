@@ -15,6 +15,13 @@
     ],
     "require": {
         "vlucas/phpdotenv": "^5.6",
-        "twilio/sdk": "^8.6"
+        "twilio/sdk": "^8.6",
+        "oracle/oci-php-sdk": "0.1"
+    },
+    "repositories": {
+        "oracle-sdk": {
+            "type": "vcs",
+            "url": "https://github.com/oracle/oci-php-sdk"
+        }
     }
 }
