@@ -7,6 +7,7 @@ use PHPMailer\PHPMailer\Exception;
 use Services\TwilioSender;
 use Auth\TokenManager;
 use Services\OracleUploader;
+use Services\LoggerService;
 
 /**
  * NotificationService handles sending reminders via WhatsApp or email.
@@ -17,6 +18,7 @@ class NotificationService
     private TwilioSender $twilio;
     private TokenManager $tokenManager;
     private OracleUploader $oracleUploader;
+    private LoggerService $logger;
 
     /**
      * NotificationService constructor.
@@ -24,11 +26,12 @@ class NotificationService
      * @param TwilioSender $twilio       The Twilio sending service.
      * @param TokenManager $tokenManager Token manager for Zoho authentication.
      */
-    public function __construct(TwilioSender $twilio, TokenManager $tokenManager)
+    public function __construct(TwilioSender $twilio, TokenManager $tokenManager, LoggerService $logger)
     {
         $this->twilio = $twilio;
         $this->tokenManager = $tokenManager;
         $this->oracleUploader = new OracleUploader();
+        $this->logger = $logger;
     }
 
     /**
@@ -48,6 +51,8 @@ class NotificationService
             return 'FAILED';
         }
 
+        $dueDate = $invoice['due_date'] ?? 'N/A';
+
         $fileName = "invoice_{$invoice['invoice_id']}.pdf";
         $pdfPath = "$pdfDir/$fileName";
 
@@ -59,18 +64,46 @@ class NotificationService
 
         // Step 3: Compose the WhatsApp message
         $message = "*Invoice Reminder*\n" .
-                   "Invoice No: *{$invoice['number']}*\n" .
-                   "Amount Due: *{$invoice['total']}*\n" .
-                   "Due Date: *{$invoice['due_date']}*\n\n" .
-                   "📎 Download Invoice: $pdfUrl\n\n" .
-                   "Please settle on or before the due date. Thank you!";
+            "Invoice No: *{$invoice['number']}*\n" .
+            "Amount Due: *{$invoice['total']}*\n" .
+            "Due Date: *{$invoice['due_date']}*\n\n" .
+             '="' . "📎 Download Invoice: $pdfUrl\n\n" .
+            "Please settle on or before the due date. Thank you!";
 
         try {
             $sid = $this->twilio->sendWhatsAppText($customerPhone, $_ENV['TWILIO_FROM'], $message);
             echo "✅ Sent to $customerPhone (SID: $sid)\n";
+
+            $this->logger->appendCsvEntry(
+                OracleUploader::formatLogRow(
+                    $invoice['invoice_id'],
+                    $invoice['number'],
+                    'SENT',
+                    'whatsapp',
+                    $customerPhone,
+                    $message,
+                    $interval, 
+                    $dueDate
+                )
+            );
+
             return 'SENT';
         } catch (\Exception $e) {
             echo "❌ WhatsApp failed for {$invoice['invoice_id']}. Trying email...\n";
+
+            $this->logger->appendCsvEntry(
+                OracleUploader::formatLogRow(
+                    $invoice['invoice_id'],
+                    $invoice['number'],
+                    'FAILED',
+                    'whatsapp',
+                    $customerPhone,
+                    $message,
+                    $interval,
+                    $dueDate
+                )
+            );
+
             return $this->sendEmailFallback($invoice, $message);
         }
     }

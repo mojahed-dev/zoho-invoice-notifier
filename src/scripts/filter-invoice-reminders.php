@@ -23,7 +23,7 @@ if (!is_dir($pdfDir)) mkdir($pdfDir, 0755, true);
 $logFile = "$logDir/sent_log.txt";
 $csvFile = "$logDir/sent_log.csv";
 if (!file_exists($logFile)) file_put_contents($logFile, '');
-if (!file_exists($csvFile)) file_put_contents($csvFile, "InvoiceID,InvoiceNumber,Interval,Phone,Status,Date\n");
+if (!file_exists($csvFile)) file_put_contents($csvFile, "Timestamp,InvoiceID,InvoiceNumber,Interval,DueDate, Status,Method,Phone,Message\n");;
 
 // === Initialize services ===
 $tokenManager = new TokenManager(
@@ -34,10 +34,11 @@ $tokenManager = new TokenManager(
 
 $zohoInvoice = new ZohoInvoice($tokenManager, $_ENV['ZOHO_ORG_ID']);
 $twilio = new TwilioSender($_ENV['TWILIO_SID'], $_ENV['TWILIO_TOKEN']);
-$notifier = new NotificationService($twilio, $tokenManager);
 $logger = new LoggerService($logFile, $csvFile);
+$notifier = new NotificationService($twilio, $tokenManager, $logger);
 
-$reminderDays = [66, 45, 40, 39, 35, 19, 15, 13, 12, 11, 10, 9, 7, 5, 3, 4, 1, 2, 0];
+
+$reminderDays = [66, 65, 45, 40, 39, 35, 34, 19, 15, 13, 12, 11, 10, 9, 7, 5, 3, 4, 1, 2, 0];
 $todayMidnight = (new DateTime())->setTime(0, 0);
 
 // === Fetch invoices and clean logs ===
@@ -61,7 +62,15 @@ foreach ($allInvoices as $invoice) {
     $status = $notifier->sendReminder($invoice, $interval, $pdfDir);
 
     $logger->appendLogEntry($logKey);
-    $logger->appendCsvEntry([
-        $invoice['invoice_id'], $interval, $invoice['phone'] ?? 'none', $status, date('Y-m-d H:i:s')
-    ]);
+    // $logger->appendCsvEntry(
+    //     \Services\OracleUploader::formatLogRow(
+    //         $invoice['invoice_id'],
+    //         $invoice['number'],
+    //         $status,
+    //         'whatsapp',
+    //         $invoice['phone'] ?? ($invoice['billing_address']['phone'] ?? 'none'),
+    //         "Reminder sent for Invoice No: {$invoice['number']}",
+    //         $interval
+    //     )
+    // );
 }

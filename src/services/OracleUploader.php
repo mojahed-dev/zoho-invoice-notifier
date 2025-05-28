@@ -2,6 +2,8 @@
 
 namespace Services;
 
+use Services\LoggerService;
+
 class OracleUploader
 {
     private string $uploadBaseUrl;
@@ -14,9 +16,10 @@ class OracleUploader
 
     /**
      * Uploads a file using Oracle's Pre-Authenticated Request (PAR) URL
+     *
      * @param string $filePath Full local path to the file
      * @param string $fileName Name to save the object as in the bucket
-     * @return string Public URL to access the uploaded file
+     * @return string Pre-authenticated URL to access the uploaded file
      */
     public function upload(string $filePath, string $fileName): string
     {
@@ -41,12 +44,40 @@ class OracleUploader
         fclose($file);
 
         if ($httpCode >= 200 && $httpCode < 300) {
-            // Construct public URL for download (you can use a different base if needed)
-            // return "https://objectstorage.me-jeddah-1.oraclecloud.com/n/ax7xwlfakloa/b/invoice_pdfs/o/" . rawurlencode($fileName);
-            return $this->uploadBaseUrl . rawurlencode($fileName);
+            // Return the same PAR-based URL for downloading
+            return $targetUrl;
         } else {
             echo "❌ Failed to upload PDF to Oracle (HTTP $httpCode)\n";
             return '';
         }
+    }
+
+    /**
+     * Helper to format message log row
+     *
+     * @param string $invoiceId
+     * @param string $invoiceNumber
+     * @param string $status (SENT, FAILED, EMAIL, etc)
+     * @param string $method (whatsapp or email)
+     * @param string $phone
+     * @param string $message
+     * @return array CSV row as array values
+     */
+    public static function formatLogRow(string $invoiceId, string $invoiceNumber, string $status, string $method, string $phone, string $message, int $interval, string $dueDate): array
+    {
+        $timestamp = date('Y-m-d H:i:s');
+        $msgShort = str_replace(["\n", "\r"], ' ', mb_substr($message, 0, 100));
+        // return [$timestamp, $invoiceId, $invoiceNumber, $interval, $status, $method, $phone, $msgShort];
+        return [
+            $timestamp,
+            '="' . $invoiceId . '"',
+            '="' . $invoiceNumber . '"',
+            $interval,
+            $dueDate,
+            $status,
+            $method,
+            '="' . $phone . '"',
+            $msgShort
+        ];
     }
 }
