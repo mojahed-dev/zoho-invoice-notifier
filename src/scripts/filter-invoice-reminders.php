@@ -38,7 +38,8 @@ $logger = new LoggerService($logFile, $csvFile);
 $notifier = new NotificationService($twilio, $tokenManager, $logger);
 
 
-$reminderDays = [66, 65, 45, 40, 39, 35, 34, 19, 15, 13, 12, 11, 10, 9, 7, 5, 3, 4, 1, 2, 0];
+// $reminderDays = [66, 65, 45, 40, 39, 35, 34, 19, 15, 13, 12, 11, 10, 9, 7, 5, 3, 4, 1, 2, 0];
+$reminderDays = [31, 64, 43, 37, 8, 7, 5, 1, 2, 0];
 $todayMidnight = (new DateTime())->setTime(0, 0);
 
 // === Fetch invoices and clean logs ===
@@ -51,7 +52,7 @@ foreach ($allInvoices as $invoice) {
 
     $dueDate = (new DateTime($invoice['due_date']))->setTime(0, 0);
     $interval = (int) $todayMidnight->diff($dueDate)->format('%r%a');
-    if (!in_array($interval, $reminderDays)) continue;
+    // if (!in_array($interval, $reminderDays)) continue;
 
     $logKey = "{$invoice['invoice_id']}_{$interval}";
     if (in_array($logKey, $filteredLog)) {

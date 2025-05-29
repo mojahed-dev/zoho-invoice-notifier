@@ -8,6 +8,7 @@ use Services\TwilioSender;
 use Auth\TokenManager;
 use Services\OracleUploader;
 use Services\LoggerService;
+// use DateTime;
 
 /**
  * NotificationService handles sending reminders via WhatsApp or email.
@@ -34,6 +35,65 @@ class NotificationService
         $this->logger = $logger;
     }
 
+
+    /**
+     * Builds a custom WhatsApp message based on interval days.
+     *
+     * @param array $invoice
+     * @param int $interval
+     * @param string $pdfUrl
+     * @return string
+     */
+    private function generateReminderMessage(array $invoice, int $interval, string $pdfUrl): string
+    {
+        date_default_timezone_set('Asia/Riyadh');
+        $companyPhone = '+966 920001785';
+        $companyWebsite = 'https://tawasul.tech/';
+        $customerName = $invoice['customer_name'] ?? 'Customer';
+        $invoiceNo = $invoice['number'];
+        $invoiceDate = $invoice['invoice_date'] ?? $invoice['date'] ?? 'N/A';
+        $amount = $invoice['total'];
+        $dueDate = $invoice['due_date'] ?? 'N/A';
+
+        $todayMidnight = (new \DateTime())->setTime(0, 0);
+        $invoiceDateObj = new \DateTime($invoiceDate);
+        $createdDaysAgo = (int) $invoiceDateObj->diff($todayMidnight)->format('%r%a');
+
+        $daysLeftText = $interval >= 0
+            ? "$interval day(s) remaining until the due date: $dueDate."
+            : "Overdue by " . abs($interval) . " day(s).";
+
+        // Detect new unpaid invoice created today
+        $isNewUnpaid = $createdDaysAgo === 0 && strtolower($invoice['status']) === 'unpaid';
+
+        // Determine message level
+        if ($isNewUnpaid) {
+            echo "NEW AND UNPAID\n";
+            $level = '*🆕 Unpaid Invoice*';
+            $daysLeftText = "This invoice was just issued and remains unpaid.";
+        } elseif ($interval > 20 && !$isNewUnpaid) {
+            $level = '🟢 *Friendly Reminder*';
+        } elseif ($interval > 5) {
+            $level = '🟡 *Important Reminder*';
+        } elseif ($interval >= 0) {
+            $level = '🔴 *Final Reminder*';
+        } else {
+            $level = '❗ *Overdue Invoice Notification*';
+        }
+
+        return "🌐 Tawasul AVL Tracking – Invoice Reminder 📄\n\n"
+            . "Dear $customerName,\n\n"
+            . "$level\n\n"
+            . "This is a reminder for your invoice *#$invoiceNo*, dated *$invoiceDate*, with a total of *SAR $amount*.\n\n"
+            . "🧾 Attached Invoice: 📎 $pdfUrl\n\n"
+            . "🕒 $daysLeftText\n\n"
+            . "Please ensure payment is ready onsite in cash. Our representative will collect it as scheduled.\n\n"
+            . "If already paid, kindly ignore this message.\n\n"
+            . "We're always here to help:\n📞 $companyPhone\n🔗 $companyWebsite";
+    }
+
+
+
     /**
      * Sends a WhatsApp reminder for a given invoice. Falls back to email if WhatsApp fails.
      *
@@ -51,7 +111,7 @@ class NotificationService
             return 'FAILED';
         }
 
-        $dueDate = $invoice['due_date'] ?? 'N/A';
+        // $dueDate = $invoice['due_date'] ?? 'N/A';
 
         $fileName = "invoice_{$invoice['invoice_id']}.pdf";
         $pdfPath = "$pdfDir/$fileName";
@@ -63,12 +123,30 @@ class NotificationService
         $pdfUrl = $this->oracleUploader->upload($pdfPath, $fileName);
 
         // Step 3: Compose the WhatsApp message
-        $message = "*Invoice Reminder*\n" .
-            "Invoice No: *{$invoice['number']}*\n" .
-            "Amount Due: *{$invoice['total']}*\n" .
-            "Due Date: *{$invoice['due_date']}*\n\n" .
-             '="' . "📎 Download Invoice: $pdfUrl\n\n" .
-            "Please settle on or before the due date. Thank you!";
+        $customerName = $invoice['customer_name'] ?? 'Customer';
+        $invoiceNumber = $invoice['number'];
+        $invoiceDate = $invoice['invoice_date'];
+        $invoiceAmount = $invoice['total'];
+        $dueDate = $invoice['due_date'];
+        $daysLeft = $interval;
+
+        // $message = "*Tawasul AVL Tracking – Invoice Reminder* 📄\n\n" .
+        //     "Dear $customerName,\n\n" .
+        //     "This is a gentle reminder from Tawasul AVL Tracking regarding your upcoming invoice #$invoiceNumber, " .
+        //     "dated $invoiceDate, with a total of SAR$invoiceAmount.\n\n" .
+        //     "🧾 Please find the attached invoice in PDF format for your reference.\n\n" .
+        //     "🕒 $daysLeft day(s) remaining until the due date: $dueDate.\n\n" .
+        //     "* Kindly ensure payment is ready onsite in cash. Our representative will collect it as scheduled.\n\n" .
+        //     "If you have already made the payment, kindly ignore this message.\n\n" .
+        //     "We're always here to assist if you have any questions.\n" .
+        //     "📞 +966 920001785\n\n" .
+        //     "Best regards,\n" .
+        //     "Tawasul AVL Tracking Team\n" .
+        //     "🌐 tawasul.tech\n\n" .
+        //     "📎 Download Invoice: $pdfUrl";
+
+        $message = $this->generateReminderMessage($invoice, $interval, $pdfUrl);
+
 
         try {
             $sid = $this->twilio->sendWhatsAppText($customerPhone, $_ENV['TWILIO_FROM'], $message);
@@ -82,7 +160,7 @@ class NotificationService
                     'whatsapp',
                     $customerPhone,
                     $message,
-                    $interval, 
+                    $interval,
                     $dueDate
                 )
             );

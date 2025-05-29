@@ -99,7 +99,7 @@ $filterDue = $_GET['due'] ?? '';
                 <td><?= htmlspecialchars($row[6]) ?></td>
                 <td><?= htmlspecialchars($row[7]) ?></td>
                 <td><?= htmlspecialchars($row[8]) ?></td>
-                <td><a href="../<?= $pdfFile ?>" target="_blank">View</a></td>
+                <td><a href="/<?= $pdfFile ?>" target="_blank">View</a></td>
                 <td><?= $retryCounts[$retryKey] ?></td>
             </tr>
         <?php endforeach; ?>
