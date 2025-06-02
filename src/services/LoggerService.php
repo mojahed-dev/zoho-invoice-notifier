@@ -44,7 +44,7 @@ class LoggerService
 
         $paidIds = array_column(
             array_filter($invoices, fn($inv) => strtolower($inv['status']) === 'paid'),
-            'invoice_id'
+            'number'
         );
 
         $filtered = array_filter($entries, fn($entry) =>

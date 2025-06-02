@@ -39,7 +39,7 @@ $notifier = new NotificationService($twilio, $tokenManager, $logger);
 
 
 // $reminderDays = [66, 65, 45, 40, 39, 35, 34, 19, 15, 13, 12, 11, 10, 9, 7, 5, 3, 4, 1, 2, 0];
-$reminderDays = [31, 64, 43, 37, 8, 7, 5, 1, 2, 0];
+$reminderDays = [30, 27, 24, 21, 18, 15, 12, 9, 6, 3, 1, 0, -1, -2, -3, -4, -5, -6, -7, -8, -9, -10];
 $todayMidnight = (new DateTime())->setTime(0, 0);
 
 // === Fetch invoices and clean logs ===
@@ -47,15 +47,26 @@ $allInvoices = $zohoInvoice->getInvoices();
 $logger->cleanPaidEntries($allInvoices);
 $filteredLog = $logger->getLogEntries();
 
+// debugg
+$filteredLogSet = array_flip($filteredLog); // Once at the top
+// var_dump($filteredLog);
+// exit;
+
 foreach ($allInvoices as $invoice) {
     if (empty($invoice['due_date']) || strtolower($invoice['status']) === 'paid') continue;
 
     $dueDate = (new DateTime($invoice['due_date']))->setTime(0, 0);
     $interval = (int) $todayMidnight->diff($dueDate)->format('%r%a');
-    // if (!in_array($interval, $reminderDays)) continue;
+    if (!in_array($interval, $reminderDays)) continue;
 
-    $logKey = "{$invoice['invoice_id']}_{$interval}";
-    if (in_array($logKey, $filteredLog)) {
+    $logKey = "{$invoice['number']}_{$interval}";
+    // if (in_array($logKey, $filteredLog)) {
+    //     echo "⚠️ Already reminded: $logKey\n";
+    //     continue;
+    // }
+
+    // debug
+    if (isset($filteredLogSet[$logKey])) {
         echo "⚠️ Already reminded: $logKey\n";
         continue;
     }

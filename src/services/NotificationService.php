@@ -66,19 +66,28 @@ class NotificationService
         // Detect new unpaid invoice created today
         $isNewUnpaid = $createdDaysAgo === 0 && strtolower($invoice['status']) === 'unpaid';
 
+        // Only allow overdue invoices if they are -1 to -10 days past due
+        if ($interval < -10) {
+            return ''; // Skip too old overdue
+        }
+
+
         // Determine message level
-        if ($isNewUnpaid) {
-            echo "NEW AND UNPAID\n";
-            $level = '*🆕 Unpaid Invoice*';
-            $daysLeftText = "This invoice was just issued and remains unpaid.";
-        } elseif ($interval > 20 && !$isNewUnpaid) {
+        // if ($isNewUnpaid) {
+        //     echo "NEW AND UNPAID\n";
+        //     $level = '*🆕 Unpaid Invoice*';
+        //     $daysLeftText = "This invoice was just issued and remains unpaid.";
+        // }
+        if ($interval > 20) {
             $level = '🟢 *Friendly Reminder*';
         } elseif ($interval > 5) {
             $level = '🟡 *Important Reminder*';
         } elseif ($interval >= 0) {
             $level = '🔴 *Final Reminder*';
-        } else {
+        } elseif ($interval >= -10) {
             $level = '❗ *Overdue Invoice Notification*';
+        } else {
+            $level = '*Invoice Reminder*';
         }
 
         return "🌐 Tawasul AVL Tracking – Invoice Reminder 📄\n\n"
@@ -107,7 +116,7 @@ class NotificationService
         $rawPhone = $invoice['phone'] ?? $invoice['billing_address']['phone'] ?? $invoice['shipping_address']['phone'] ?? null;
         $customerPhone = $rawPhone ? 'whatsapp:' . $rawPhone : null;
         if (!$customerPhone) {
-            echo "⚠️ Skipping invoice {$invoice['invoice_id']} — no phone\n";
+            echo "⚠️ Skipping invoice {$invoice['number']} — no phone\n";
             return 'FAILED';
         }
 
@@ -150,7 +159,7 @@ class NotificationService
 
         try {
             $sid = $this->twilio->sendWhatsAppText($customerPhone, $_ENV['TWILIO_FROM'], $message);
-            echo "✅ Sent to $customerPhone (SID: $sid)\n";
+            echo "✅ Sent to $customerPhone (SID: $sid) Invoice #:$invoiceNumber \n";
 
             $this->logger->appendCsvEntry(
                 OracleUploader::formatLogRow(
